@@ -55,6 +55,7 @@ static FILE* logFile = NULL;
 static pthread_mutex_t networkMutex, veriflowMutex;
 
 static VeriFlow veriflow;
+Network network;
 
 int mode = TEST_MODE;
 
@@ -78,7 +79,7 @@ int main(int argc, char** argv)
 
 	mode = PROXY_MODE;
 
-	Network network;
+	// Network network;
 
 	string topologyFileName = argv[4];
 	parseTopologyFile(topologyFileName, network);
@@ -973,6 +974,8 @@ void VeriFlow::processCurrentHop(const EquivalenceClass& packetClass, Forwarding
 
 bool VeriFlow::verifyRule(const Rule& rule, int command, double& updateTime, double& packetClassSearchTime, double& graphBuildTime, double& queryTime, unsigned long& ecCount, FILE* fp)
 {
+	// fprintf(fp, "[VeriFlow::verifyRule] verifying this rule: %s\n", rule.toString().c_str());
+		
 	updateTime = packetClassSearchTime = graphBuildTime = queryTime = 0;
 	ecCount = 0;
 
@@ -1024,7 +1027,6 @@ bool VeriFlow::verifyRule(const Rule& rule, int command, double& updateTime, dou
 	{
 		EquivalenceClass packetClass = vFinalPacketClasses[i];
 		// fprintf(stdout, "[VeriFlow::verifyRule] [%u] ecCount: %lu, %s\n", i, ecCount, packetClass.toString().c_str());
-
 		ForwardingGraph* graph = Trie::getForwardingGraph(TP_DST, vFinalTries[i], packetClass, fp);
 		vGraph.push_back(graph);
 	}
@@ -1043,7 +1045,9 @@ bool VeriFlow::verifyRule(const Rule& rule, int command, double& updateTime, dou
 	for(unsigned int i = 0; i < vGraph.size(); i++)
 	{
 		unordered_set< string > visited;
-		if(!this->traverseForwardingGraph(vFinalPacketClasses[i], vGraph[i], rule.location, visited, fp)) {
+		string lastHop = network.getNextHopIpAddress(rule.location,rule.in_port);
+		// fprintf(fp, "start traversing at: %s\n", rule.location.c_str());
+		if(!this->traverseForwardingGraph(vFinalPacketClasses[i], vGraph[i], rule.location, lastHop, visited, fp)) {
 			++currentFailures;
 		}
 	}
@@ -1084,8 +1088,10 @@ bool VeriFlow::verifyRule(const Rule& rule, int command, double& updateTime, dou
 	return true;
 }
 
-bool VeriFlow::traverseForwardingGraph(const EquivalenceClass& packetClass, ForwardingGraph* graph, const string& currentLocation, unordered_set< string > visited, FILE* fp)
+bool VeriFlow::traverseForwardingGraph(const EquivalenceClass& packetClass, ForwardingGraph* graph, const string& currentLocation, const string& lastHop, unordered_set< string > visited, FILE* fp)
 {
+
+	// fprintf(fp, "traversing at node: %s\n", currentLocation.c_str());
 	if(graph == NULL)
 	{
 		/* fprintf(fp, "\n");
@@ -1113,7 +1119,7 @@ bool VeriFlow::traverseForwardingGraph(const EquivalenceClass& packetClass, Forw
 			}
 		}
 		faults.push_back(packetClass);
-		
+
 		return false;
 	}
 
@@ -1157,6 +1163,33 @@ bool VeriFlow::traverseForwardingGraph(const EquivalenceClass& packetClass, Forw
 
 	const list< ForwardingLink >& linkList = graph->links[currentLocation];
 	list< ForwardingLink >::const_iterator itr = linkList.begin();
+	// input_port as a filter
+	if(lastHop.compare("NULL") == 0 || itr->rule.in_port == 65536){
+		// do nothing
+	}
+	else{
+		while(itr != linkList.end()){
+			string connected_hop = network.getNextHopIpAddress(currentLocation, itr->rule.in_port);
+			if(connected_hop.compare(lastHop) == 0) break;
+			itr++;
+		}
+	}
+	
+	if(itr == linkList.end()){
+		// Found a black hole.
+		fprintf(fp, "\n");
+		fprintf(fp, "[VeriFlow::traverseForwardingGraph] Found a BLACK HOLE for the following packet class as there is no outgoing link at current location (%s).\n", currentLocation.c_str());
+		fprintf(fp, "[VeriFlow::traverseForwardingGraph] PacketClass: %s\n", packetClass.toString().c_str());
+		for(unsigned int i = 0; i < faults.size(); i++) {
+			if (packetClass.subsumes(faults[i])) {
+				faults.erase(faults.begin() + i);
+				i--;
+			}
+		}
+		faults.push_back(packetClass);
+
+		return false;
+	}
 
 	if(itr->isGateway == true)
 	{
@@ -1187,7 +1220,7 @@ bool VeriFlow::traverseForwardingGraph(const EquivalenceClass& packetClass, Forw
 			fprintf(fp, "[VeriFlow::traverseForwardingGraph] PacketClass: %s\n", packetClass.toString().c_str()); */
 		}
 
-		return this->traverseForwardingGraph(packetClass, graph, itr->rule.nextHop, visited, fp);
+		return this->traverseForwardingGraph(packetClass, graph, itr->rule.nextHop, currentLocation, visited, fp);
 	}
 }
 

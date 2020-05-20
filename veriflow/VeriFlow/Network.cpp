@@ -18,6 +18,7 @@
 #include <cstdio>
 #include <string>
 #include <unordered_map>
+#include <sstream>
 #include "Network.h"
 #include "ForwardingDevice.h"
 

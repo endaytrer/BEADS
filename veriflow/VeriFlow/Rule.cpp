@@ -36,6 +36,7 @@ Rule::Rule()
 
 	this->location = "";
 	this->nextHop = "";
+	this->in_port = 65536;
 	this->priority = INVALID_PRIORITY;
 	// this->outPort = OFPP_NONE;
 }
@@ -54,6 +55,7 @@ Rule::Rule(const Rule& other)
 
 	this->location = other.location;
 	this->nextHop = other.nextHop;
+	this->in_port = other.in_port;
 	this->priority = other.priority;
 	// this->outPort = other.outPort;
 }
@@ -179,6 +181,7 @@ bool Rule::equals(const Rule& other) const
 	if((this->type == other.type)
 			&& (this->wildcards == other.wildcards)
 			&& (this->location.compare(other.location) == 0)
+			&& (this->in_port == other.in_port)
 			// && (this->nextHop.compare(other.nextHop) == 0) // Not present in OFPT_FLOW_REMOVED messages.
 			&& (this->priority == other.priority)
 			// && (this->outPort == other.outPort) // Not used in this version.
@@ -222,6 +225,7 @@ int Rule::operator()() const
 	retVal += this->type;
 	retVal += (int)this->wildcards;
 	retVal += (int)::getIpValueAsInt(this->location);
+	retVal += this->in_port;
 	// retVal += (int)::getIpValueAsInt(this->nextHop);
 	retVal += this->priority;
 	// retVal += this->outPort;
@@ -232,13 +236,13 @@ int Rule::operator()() const
 string Rule::toString() const
 {
 	char buffer[1024];
-	sprintf(buffer, "[Rule] type: %d, dlSrcAddr: %s, dlSrcAddrMask: %s, dlDstAddr: %s, dlDstAddrMask: %s, nwSrcAddr: %s, nwSrcAddrMask: %s, nwDstAddr: %s, nwDstAddrMask: %s, location: %s, nextHop: %s, priority: %u",
+	sprintf(buffer, "[Rule] type: %d, dlSrcAddr: %s, dlSrcAddrMask: %s, dlDstAddr: %s, dlDstAddrMask: %s, nwSrcAddr: %s, nwSrcAddrMask: %s, nwDstAddr: %s, nwDstAddrMask: %s, location: %s, nextHop: %s, in_port: %u, priority: %u",
 			this->type,
 			this->fieldValue[DL_SRC].c_str(), this->fieldMask[DL_SRC].c_str(),
 			this->fieldValue[DL_DST].c_str(), this->fieldMask[DL_DST].c_str(),
 			this->fieldValue[NW_SRC].c_str(), this->fieldMask[NW_SRC].c_str(),
 			this->fieldValue[NW_DST].c_str(), this->fieldMask[NW_DST].c_str(),
-			this->location.c_str(), this->nextHop.c_str(), this->priority);
+			this->location.c_str(), this->nextHop.c_str(), this->in_port, this->priority);
 
 	string retVal = buffer;
 	retVal += ", ";

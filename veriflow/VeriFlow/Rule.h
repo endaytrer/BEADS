@@ -41,6 +41,7 @@ public:
 
 	string location;
 	string nextHop;
+	unsigned int in_port;
 	uint16_t priority;
 	// uint16_t outPort; // Not used in this version.
 

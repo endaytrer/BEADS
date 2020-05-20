@@ -292,8 +292,10 @@ void OpenFlowProtocolMessage::processFlowRemoved(const char* data, ProxyConnecti
 	rule.type = FORWARDING;
 	rule.wildcards = ntohl(ofr->match.wildcards);
 
-	rule.fieldValue[IN_PORT] = ::convertIntToString(ntohs(ofr->match.in_port));
-	rule.fieldMask[IN_PORT] = ((rule.wildcards == OFPFW_ALL) || ((rule.wildcards & OFPFW_IN_PORT) != 0)) ? "0" : "65535";
+	rule.fieldValue[IN_PORT] = "0";//::convertIntToString(ntohs(ofr->match.in_port));
+	rule.fieldMask[IN_PORT] = "0";//((rule.wildcards == OFPFW_ALL) || ((rule.wildcards & OFPFW_IN_PORT) != 0)) ? "0" : "65535";
+
+	rule.in_port = ntohs(ofr->match.in_port);
 
 	rule.fieldValue[DL_SRC] = ::getMacValueAsString(ofr->match.dl_src);
 	rule.fieldMask[DL_SRC] = ((rule.wildcards == OFPFW_ALL) || ((rule.wildcards & OFPFW_DL_SRC) != 0)) ? "0:0:0:0:0:0" : "FF:FF:FF:FF:FF:FF";
@@ -346,12 +348,13 @@ void OpenFlowProtocolMessage::processFlowRemoved(const char* data, ProxyConnecti
 	rule.nextHop = "";
 	rule.priority = ntohs(ofr->priority);
 
-	/* double updateTime = 0, packetClassSearchTime = 0, graphBuildTime = 0, queryTime = 0;
-	unsigned long ecCount = 0; */
+	/*double updateTime = 0, packetClassSearchTime = 0, graphBuildTime = 0, queryTime = 0;
+	unsigned long ecCount = 0;*/
 
 	// gettimeofday(&start, NULL);
 	pthread_mutex_lock(info.veriflowMutex);
 	// info.veriflow->verifyRule(rule, OFPT_FLOW_REMOVED, updateTime, packetClassSearchTime, graphBuildTime, queryTime, ecCount, fp);
+	fprintf(fp, "removing rule %s\n", rule.toString().c_str());
 	info.veriflow->removeRule(rule);
 	pthread_mutex_unlock(info.veriflowMutex);
 }
@@ -404,8 +407,10 @@ void OpenFlowProtocolMessage::processFlowMod(const char* data, ProxyConnectionIn
 				rule.type = FORWARDING;
 				rule.wildcards = ntohl(ofm->match.wildcards);
 
-				rule.fieldValue[IN_PORT] = ::convertIntToString(ntohs(ofm->match.in_port));
-				rule.fieldMask[IN_PORT] = ((rule.wildcards == OFPFW_ALL) || ((rule.wildcards & OFPFW_IN_PORT) != 0)) ? "0" : "65535";
+				rule.fieldValue[IN_PORT] = "0";
+				rule.fieldMask[IN_PORT] = "0";//((rule.wildcards == OFPFW_ALL) || ((rule.wildcards & OFPFW_IN_PORT) != 0)) ? "0" : "65535";
+
+				rule.in_port = ntohs(ofm->match.in_port);
 
 				rule.fieldValue[DL_SRC] = ::getMacValueAsString(ofm->match.dl_src);
 				rule.fieldMask[DL_SRC] = ((rule.wildcards == OFPFW_ALL) || ((rule.wildcards & OFPFW_DL_SRC) != 0)) ? "0:0:0:0:0:0" : "FF:FF:FF:FF:FF:FF";
