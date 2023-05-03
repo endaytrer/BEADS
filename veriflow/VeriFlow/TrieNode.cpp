@@ -19,52 +19,45 @@
 
 using namespace std;
 
-TrieNode::TrieNode()
-{
-	this->parent = NULL;
-	this->zeroBranch = NULL;
-	this->oneBranch = NULL;
-	this->wildcardBranch = NULL;
-	this->nextLevelTrie = NULL;
-	this->ruleSet = NULL;
+TrieNode::TrieNode() {
+    this->parent = nullptr;
+    this->zeroBranch = nullptr;
+    this->oneBranch = nullptr;
+    this->wildcardBranch = nullptr;
+    this->nextLevelTrie = nullptr;
+    this->ruleSet = nullptr;
 }
 
-TrieNode::~TrieNode()
-{
+TrieNode::~TrieNode() {
 //	fprintf(stdout, "Destroying TrieNode.\n");
 
-	if(this->zeroBranch != NULL)
-	{
-		// fprintf(stdout, "\tDestroying zeroBranch.\n");
-		delete this->zeroBranch;
-		this->zeroBranch = NULL;
-	}
+    if (this->zeroBranch != nullptr) {
+        // fprintf(stdout, "\tDestroying zeroBranch.\n");
+        delete this->zeroBranch;
+        this->zeroBranch = nullptr;
+    }
 
-	if(this->oneBranch != NULL)
-	{
-		// fprintf(stdout, "\tDestroying oneBranch.\n");
-		delete this->oneBranch;
-		this->oneBranch = NULL;
-	}
+    if (this->oneBranch != nullptr) {
+        // fprintf(stdout, "\tDestroying oneBranch.\n");
+        delete this->oneBranch;
+        this->oneBranch = nullptr;
+    }
 
-	if(this->wildcardBranch != NULL)
-	{
-		// fprintf(stdout, "\tDestroying wildcardBranch.\n");
-		delete this->wildcardBranch;
-		this->wildcardBranch = NULL;
-	}
+    if (this->wildcardBranch != nullptr) {
+        // fprintf(stdout, "\tDestroying wildcardBranch.\n");
+        delete this->wildcardBranch;
+        this->wildcardBranch = nullptr;
+    }
 
-	if(this->nextLevelTrie != NULL)
-	{
-		// fprintf(stdout, "\tDestroying nextLevelTrie.\n");
-		delete this->nextLevelTrie;
-		this->nextLevelTrie = NULL;
-	}
+    if (this->nextLevelTrie != nullptr) {
+        // fprintf(stdout, "\tDestroying nextLevelTrie.\n");
+        delete this->nextLevelTrie;
+        this->nextLevelTrie = nullptr;
+    }
 
-	if(this->ruleSet != NULL)
-	{
-		// fprintf(stdout, "\tDestroying ruleSet.\n");
-		delete this->ruleSet;
-		this->ruleSet = NULL;
-	}
+    if (this->ruleSet != nullptr) {
+        // fprintf(stdout, "\tDestroying ruleSet.\n");
+        delete this->ruleSet;
+        this->ruleSet = nullptr;
+    }
 }

@@ -30,42 +30,57 @@
 
 using namespace std;
 
-class Trie
-{
-	friend class Test;
+class Trie {
+    friend class Test;
 
 private:
-	TrieNode* root;
-	FieldIndex fieldIndex;
+    TrieNode *root;
+    FieldIndex fieldIndex; // Since a trie can only mark one field
 
-	list< uint64_t > lowerBoundList, upperBoundList;
-	unordered_map< uint64_t, uint64_t > lowerBoundMap, upperBoundMap;
+    list <uint64_t> lowerBoundList, upperBoundList;
+    unordered_map<uint64_t, uint64_t> lowerBoundMap, upperBoundMap; // the greatest upper bound of lower bound, the lowest lower bound of upper bound
 
-	void addToBoundList(uint64_t lowerBound, uint64_t upperBound);
+    void addToBoundList(uint64_t lowerBound, uint64_t upperBound);
 
-	static uint64_t getIntValue(FieldIndex index, const string& valueOrMask);
-	static void addToBoundList(uint64_t lowerBound, uint64_t upperBound,
-			list< uint64_t >& lowerBoundList, list< uint64_t >& upperBoundList,
-			unordered_map< uint64_t, uint64_t >& lowerBoundMap, unordered_map< uint64_t, uint64_t >& upperBoundMap);
-	static void traversePreorder(const TrieNode* node, FieldIndex index, int level, int branch, FILE* fp);
+    static uint64_t getIntValue(FieldIndex index, const string &valueOrMask);
+
+    static void addToBoundList(uint64_t lowerBound, uint64_t upperBound,
+                               list <uint64_t> &lowerBoundList, list <uint64_t> &upperBoundList,
+                               unordered_map<uint64_t, uint64_t> &lowerBoundMap,
+                               unordered_map<uint64_t, uint64_t> &upperBoundMap);
+
+    static void traversePreorder(const TrieNode *node, FieldIndex index, int level, int branch, FILE *fp);
 
 public:
-	int totalRuleCount;
+    int totalRuleCount;
 
-	Trie(FieldIndex fi);
-	~Trie();
-	FieldIndex getFieldIndex();
-	unsigned int getFieldWidth();
-	TrieNode* findNode(const string& fieldValue, const string& fieldMask);
-	TrieNode* addRule(const Rule& rule);
-	void removeRule(TrieNode* node);
-	void getEquivalenceClasses(const Rule& rule, vector< EquivalenceClass >& vPacketClasses);
+    explicit Trie(FieldIndex fi);
 
-	int getTotalRuleCount() const;
-	void print(FILE* fp) const;
+    ~Trie();
 
-	static void getNextLevelEquivalenceClasses(FieldIndex currentFieldIndex, uint64_t lb, const Rule& rule, const vector< Trie* >& vInputTries, vector< EquivalenceClass >& vPacketClasses, vector< Trie* >& vOutputTries);
-	static ForwardingGraph* getForwardingGraph(FieldIndex currentFieldIndex, const vector< Trie* >& vInputTries, const EquivalenceClass& packetClass, FILE* fp);
+    FieldIndex getFieldIndex();
+
+    unsigned int getFieldWidth();
+
+    TrieNode *findNode(const string &fieldValue, const string &fieldMask);
+
+    TrieNode *addRule(const Rule &rule);
+
+    void removeRule(TrieNode *node);
+
+    void getEquivalenceClasses(const Rule &rule, vector<EquivalenceClass> &vPacketClasses);
+    EquivalenceRange getEquivalenceRangeAndTraverse(const Rule &rule, TrieNode *&out_Node);
+
+    int getTotalRuleCount() const;
+
+    void print(FILE *fp) const;
+
+    static void getNextLevelEquivalenceClasses(FieldIndex currentFieldIndex, uint64_t lb, const Rule &rule,
+                                               const vector<Trie *> &vInputTries,
+                                               vector<EquivalenceClass> &vPacketClasses, vector<Trie *> &vOutputTries);
+
+    static ForwardingGraph *getForwardingGraph(FieldIndex currentFieldIndex, const vector<Trie *> &vInputTries,
+                                               const EquivalenceClass &packetClass, FILE *fp);
 };
 
 #endif /* TRIE_H_ */

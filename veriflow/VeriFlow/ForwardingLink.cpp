@@ -20,37 +20,30 @@
 
 using namespace std;
 
-ForwardingLink::ForwardingLink()
-{
-	this->isGateway = false;
+ForwardingLink::ForwardingLink() {
+    this->isGateway = false;
 }
 
-ForwardingLink::ForwardingLink(const Rule& r, bool g)
-{
-	this->rule = r;
-	this->isGateway = g;
+ForwardingLink::ForwardingLink(const Rule &r, bool g) {
+    this->rule = r;
+    this->isGateway = g;
 }
 
-bool ForwardingLink::equals(const ForwardingLink& other) const
-{
-	if((this->rule.equals(other.rule) == true)
-			&& (this->isGateway == other.isGateway)
-	)
-	{
-		return true;
-	}
-	else
-	{
-		return false;
-	}
+bool ForwardingLink::equals(const ForwardingLink &other) const {
+    if (this->rule.equals(other.rule)
+        && (this->isGateway == other.isGateway)
+            ) {
+        return true;
+    } else {
+        return false;
+    }
 }
 
-string ForwardingLink::toString() const
-{
-	char buffer[1024];
-	sprintf(buffer, "[ForwardingLink] Rule: %s, IsGateway: %d",
-			this->rule.toString().c_str(), this->isGateway);
+string ForwardingLink::toString() const {
+    char buffer[1024];
+    sprintf(buffer, "[ForwardingLink] Rule: %s, IsGateway: %d",
+            this->rule.toString().c_str(), this->isGateway);
 
-	string retVal = buffer;
-	return retVal;
+    string retVal = buffer;
+    return retVal;
 }

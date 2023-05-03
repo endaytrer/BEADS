@@ -22,7 +22,9 @@
 #include <string>
 
 using namespace std;
-
+/**
+ * Equivalence Range. A single field of equivalent class
+ */
 class EquivalenceRange
 {
 public:

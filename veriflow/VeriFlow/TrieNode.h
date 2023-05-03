@@ -25,18 +25,18 @@ using namespace std;
 
 class Trie; // forward declaration
 
-class TrieNode
-{
+class TrieNode {
 public:
-	TrieNode* parent;
-	TrieNode* zeroBranch;
-	TrieNode* oneBranch;
-	TrieNode* wildcardBranch;
-	Trie* nextLevelTrie;
-	unordered_set< Rule, KHash< Rule >, KEqual< Rule > >* ruleSet;
+    TrieNode *parent;
+    TrieNode *zeroBranch;
+    TrieNode *oneBranch;
+    TrieNode *wildcardBranch;
+    Trie *nextLevelTrie;
+    unordered_set<Rule, KHash<Rule>, KEqual<Rule> > *ruleSet;
 
-	TrieNode();
-	~TrieNode();
+    TrieNode();
+
+    ~TrieNode();
 };
 
 #endif /* TRIENODE_H_ */

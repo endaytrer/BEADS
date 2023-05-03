@@ -26,18 +26,18 @@ using namespace std;
 enum FieldIndex
 {
 	IN_PORT, // 0
-	DL_SRC,
+	DL_SRC, // Data Link Layer (MAC address)
 	DL_DST,
 	DL_TYPE,
 	DL_VLAN,
 	DL_VLAN_PCP,
 	MPLS_LABEL,
 	MPLS_TC,
-	NW_SRC,
+	NW_SRC, // Network Layer, (IP address)
 	NW_DST,
 	NW_PROTO,
 	NW_TOS,
-	TP_SRC,
+	TP_SRC, // Transport Layer, (port)
 	TP_DST,
 	ALL_FIELD_INDEX_END_MARKER, // 14
 	METADATA, // 15, not used in this version.

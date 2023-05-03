@@ -13,144 +13,111 @@
  * All rights reserved.
  */
 
-#include <sys/types.h>
-#include <unistd.h>
 #include <cstdio>
 #include <string>
 #include <unordered_map>
-#include <sstream>
 #include "Network.h"
 #include "ForwardingDevice.h"
 
 using namespace std;
 
-bool Network::addDevice(uint64_t id, const string& ipAddress, bool endDevice)
-{
-	if(this->isDevicePresent(ipAddress) == false)
-	{
-		ForwardingDevice device;
-		device.id = id;
-		device.ipAddress = ipAddress;
-		device.endDevice = endDevice;
-		this->deviceMap[ipAddress] = device;
+/**
+ * Add a device. if exist, return false
+ * @param id
+ * @param ipAddress
+ * @param endDevice
+ * @return
+ */
+bool Network::addDevice(uint64_t id, const string &ipAddress, bool endDevice) {
+    if (!this->isDevicePresent(ipAddress)) {
+        ForwardingDevice device;
+        device.id = id;
+        device.ipAddress = ipAddress;
+        device.endDevice = endDevice;
+        this->deviceMap[ipAddress] = device;
 
-		this->idToIpAddressMap[id] = ipAddress;
+        this->idToIpAddressMap[id] = ipAddress;
 
-		return true;
-	}
-	else
-	{
-		return false;
-	}
+        return true;
+    } else {
+        return false;
+    }
 }
 
-bool Network::addPort(const string& ipAddress, unsigned int port, const string& nextHopIpAddress)
-{
-	if(this->isDevicePresent(ipAddress) == false)
-	{
-		return false;
-	}
-	else
-	{
-		this->deviceMap[ipAddress].portToNextHopIpAddressMap[port] = nextHopIpAddress;
-		return true;
-	}
+bool Network::addPort(const string &ipAddress, unsigned int port, const string &nextHopIpAddress) {
+    if (!this->isDevicePresent(ipAddress)) {
+        return false;
+    } else {
+        this->deviceMap[ipAddress].portToNextHopIpAddressMap[port] = nextHopIpAddress;
+        return true;
+    }
 }
 
-string Network::getNextHopIpAddress(const string& ipAddress, unsigned int port)
-{
-	if(this->isDevicePresent(ipAddress) == false)
-	{
-		return "NULL";
-	}
-	else
-	{
-		if(this->isPortPresent(ipAddress, port) ==  false)
-		{
-			return "NULL";
-		}
-		else
-		{
-			return this->deviceMap[ipAddress].portToNextHopIpAddressMap[port];
-		}
-	}
+string Network::getNextHopIpAddress(const string &ipAddress, unsigned int port) {
+    if (!this->isDevicePresent(ipAddress)) {
+        return "NULL";
+    } else {
+        if (!this->isPortPresent(ipAddress, port)) {
+            return "NULL";
+        } else {
+            return this->deviceMap[ipAddress].portToNextHopIpAddressMap[port];
+        }
+    }
 }
 
-bool Network::isEndDevice(const string& ipAddress)
-{
-	if(this->isDevicePresent(ipAddress) == false)
-	{
-		return false;
-	}
-	else
-	{
-		return (this->deviceMap[ipAddress].endDevice == true);
-	}
+bool Network::isEndDevice(const string &ipAddress) {
+    if (!this->isDevicePresent(ipAddress)) {
+        return false;
+    } else {
+        return this->deviceMap[ipAddress].endDevice;
+    }
 }
 
-bool Network::isDevicePresent(const string& ipAddress) const
-{
-	if(this->deviceMap.find(ipAddress) == this->deviceMap.end())
-	{
-		return false;
-	}
-	else
-	{
-		return true;
-	}
+bool Network::isDevicePresent(const string &ipAddress) const {
+    if (this->deviceMap.find(ipAddress) == this->deviceMap.end()) {
+        return false;
+    } else {
+        return true;
+    }
 }
 
-bool Network::isPortPresent(const string& ipAddress, unsigned int port)
-{
-	if(this->isDevicePresent(ipAddress) == false)
-	{
-		return false;
-	}
-	else
-	{
-		if(this->deviceMap[ipAddress].portToNextHopIpAddressMap.find(port) == this->deviceMap[ipAddress].portToNextHopIpAddressMap.end())
-		{
-			return false;
-		}
-		else
-		{
-			return true;
-		}
-	}
+bool Network::isPortPresent(const string &ipAddress, unsigned int port) {
+    if (!this->isDevicePresent(ipAddress)) {
+        return false;
+    } else {
+        if (this->deviceMap[ipAddress].portToNextHopIpAddressMap.find(port) ==
+            this->deviceMap[ipAddress].portToNextHopIpAddressMap.end()) {
+            return false;
+        } else {
+            return true;
+        }
+    }
 }
 
-string Network::getDeviceIpAddress(uint64_t id)
-{
-	if(this->idToIpAddressMap.find(id) == this->idToIpAddressMap.end())
-	{
-		return "NULL";
-	}
-	else
-	{
-		return this->idToIpAddressMap[id];
-	}
+string Network::getDeviceIpAddress(uint64_t id) {
+    if (this->idToIpAddressMap.find(id) == this->idToIpAddressMap.end()) {
+        return "NULL";
+    } else {
+        return this->idToIpAddressMap[id];
+    }
 }
 
-void Network::print() const
-{
-	unordered_map< string, ForwardingDevice >::const_iterator itr1;
-	for(itr1 = this->deviceMap.begin(); itr1 != this->deviceMap.end(); itr1++)
-	{
-		const ForwardingDevice& device = itr1->second;
-		fprintf(stdout, "id %lu ipAddress %s endDevice %d", device.id, device.ipAddress.c_str(), device.endDevice);
+void Network::print() const {
+    unordered_map<string, ForwardingDevice>::const_iterator itr1;
+    for (itr1 = this->deviceMap.begin(); itr1 != this->deviceMap.end(); itr1++) {
+        const ForwardingDevice &device = itr1->second;
+        fprintf(stdout, "id %lu ipAddress %s endDevice %d", device.id, device.ipAddress.c_str(), device.endDevice);
 
-		unordered_map< unsigned int, string >::const_iterator itr2;
-		for(itr2 = device.portToNextHopIpAddressMap.begin(); itr2 != device.portToNextHopIpAddressMap.end(); itr2++)
-		{
-			fprintf(stdout, " port %u nextHopIpAddress %s", itr2->first, itr2->second.c_str());
-		}
+        unordered_map<unsigned int, string>::const_iterator itr2;
+        for (itr2 = device.portToNextHopIpAddressMap.begin(); itr2 != device.portToNextHopIpAddressMap.end(); itr2++) {
+            fprintf(stdout, " port %u nextHopIpAddress %s", itr2->first, itr2->second.c_str());
+        }
 
-		fprintf(stdout, "\n\n");
-	}
+        fprintf(stdout, "\n\n");
+    }
 
-	unordered_map< uint64_t, string >::const_iterator itr3;
-	for(itr3 = this->idToIpAddressMap.begin(); itr3 != this->idToIpAddressMap.end(); itr3++)
-	{
-		fprintf(stdout, "id %lu ipAddress %s\n", itr3->first, itr3->second.c_str());
-	}
+    unordered_map<uint64_t, string>::const_iterator itr3;
+    for (itr3 = this->idToIpAddressMap.begin(); itr3 != this->idToIpAddressMap.end(); itr3++) {
+        fprintf(stdout, "id %lu ipAddress %s\n", itr3->first, itr3->second.c_str());
+    }
 }

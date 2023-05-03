@@ -71,7 +71,7 @@ struct NextHopInfo
 	unordered_set< string > visited;
 };
 
-void parseTopologyFile(const string& fileName, Network& network);
+void parseTopologyFile(const string& fileName, Network& io_network);
 
 void handleVeriFlowConnection(VeriFlowConnectionInfo& info);
 void* proxyCommunicationThreadFunction(void* arg);
