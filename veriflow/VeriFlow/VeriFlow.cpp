@@ -663,7 +663,7 @@ VeriFlow::processCurrentHop(const EquivalenceClass &packetClass, ForwardingGraph
 
 bool VeriFlow::verifyRule(const Rule &rule, int command, double &updateTime, double &packetClassSearchTime,
                           double &graphBuildTime, double &queryTime, unsigned long &ecCount, FILE *fp) {
-    // fprintf(fp, "[VeriFlow::verifyRule] verifying this rule: %s\n", rule.toString().c_str());
+     fprintf(fp, "[VeriFlow::verifyRule] verifying this rule: %s\n", rule.toString().c_str());
 
     updateTime = packetClassSearchTime = graphBuildTime = queryTime = 0;
     ecCount = 0;
@@ -685,6 +685,7 @@ bool VeriFlow::verifyRule(const Rule &rule, int command, double &updateTime, dou
     vector<vector<Trie *> > vFinalTries;
 
     bool res = this->getAffectedEquivalenceClasses(rule, command, vFinalPacketClasses, vFinalTries);
+    fprintf(fp, "[VeriFlow::verifyRule] ecCount: %zu\n", vFinalPacketClasses.size());
     if (!res) {
         return false;
     }
