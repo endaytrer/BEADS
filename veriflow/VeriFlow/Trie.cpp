@@ -13,11 +13,8 @@
  * All rights reserved.
  */
 
-#include <sys/types.h>
-#include <unistd.h>
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
 #include <stack>
 #include "Trie.h"
 #include "EquivalenceClass.h"
@@ -176,8 +173,8 @@ TrieNode *Trie::addRule(const Rule &rule) {
 
     return currentNode;
 }
-
-void Trie::removeRule(TrieNode *node) { // since rules can only be added to leaf nodes, if parent have more than one child, delete parent as well.
+// since rules can only be added to leaf nodes, if parent have more than one child, delete parent as well.
+void Trie::removeRule(TrieNode *node) {
     TrieNode *parent = node->parent;
     while (parent != nullptr) {
         if (
@@ -700,7 +697,7 @@ void Trie::getNextLevelEquivalenceClasses(FieldIndex currentFieldIndex, uint64_t
     while (!upperBoundList.empty()) {
         if (!lowerBoundList.empty()) {
             lowerBound = lowerBoundList.front();
-            if ((lowerBound > (upperBound + 1))
+            if ((lowerBound > (upperBound + 1)) // Where is the f*king upperbound being set??
                 /* && (upperBoundList.front() > (upperBound + 1))
                 && (upperBoundMap[upperBoundList.front()] < (upperBound + 1)) */) {
                 lowerBound = upperBound + 1;
@@ -753,6 +750,8 @@ void Trie::getNextLevelEquivalenceClasses(FieldIndex currentFieldIndex, uint64_t
 ForwardingGraph *Trie::getForwardingGraph(FieldIndex currentFieldIndex, const vector<Trie *> &vInputTries,
                                           const EquivalenceClass &packetClass, FILE *fp) {
     ForwardingGraph *graph = new ForwardingGraph;
+    //NOTE: Forwarding graph is a Map of vertices. Each vertex contains a list of rules, which is the next hop.
+
     if (graph == nullptr) {
         fprintf(stderr, "[Trie::getForwardingGraph] Memory allocation error (graph == nullptr). Terminating process.\n");
         exit(1);
@@ -770,17 +769,16 @@ ForwardingGraph *Trie::getForwardingGraph(FieldIndex currentFieldIndex, const ve
 
     uint64_t maskedFieldValue = fieldValue & fieldMask;
 
-    for (unsigned int t = 0; t < vInputTries.size(); t++) {
-        Trie *inputTrie = vInputTries[t];
+    for (auto inputTrie : vInputTries) {
         if (inputTrie->getTotalRuleCount() == 0) {
             continue;
         }
 
         vector<TrieNode *> vCurrentLevelNodes, vNextLevelNodes;
         vCurrentLevelNodes.push_back(inputTrie->root);
-        TrieNode *currentNode = nullptr;
+        TrieNode *currentNode;
 
-        for (unsigned int i = 0; i < ::fieldWidth[currentFieldIndex]; i++) {
+        for (unsigned int i = 0; i < ::fieldWidth[currentFieldIndex]; i++) { // Layer order traversal
             while (!vCurrentLevelNodes.empty()) {
                 currentNode = vCurrentLevelNodes.at(0);
                 vCurrentLevelNodes.erase(vCurrentLevelNodes.begin());
@@ -832,8 +830,8 @@ ForwardingGraph *Trie::getForwardingGraph(FieldIndex currentFieldIndex, const ve
             vNextLevelNodes.erase(vNextLevelNodes.begin(), vNextLevelNodes.end());
         }
 
-        for (unsigned int i = 0; i < vCurrentLevelNodes.size(); i++) {
-            TrieNode *node = vCurrentLevelNodes[i];
+        // Nodes in the last layer.
+        for (auto node : vCurrentLevelNodes) {
             if (node->ruleSet != nullptr) {
                 unordered_set<Rule, KHash<Rule>, KEqual<Rule> >::const_iterator itr;
                 for (itr = node->ruleSet->begin(); itr != node->ruleSet->end(); ++itr) {
@@ -850,15 +848,16 @@ ForwardingGraph *Trie::getForwardingGraph(FieldIndex currentFieldIndex, const ve
 
                     if (mode == TEST_MODE) {
                         // For the testVerification() experiment present in Test.cpp.
-                        if (rule.location.compare(rule.nextHop) == 0) {
+                        if (rule.location == rule.nextHop) {
                             link.isGateway = true;
                         }
                     } else if (mode == PROXY_MODE) {
-                        if (rule.nextHop.compare(rule.fieldValue[NW_DST]) == 0) {
+                        // set gateways to the rules where nextHop is destination, or destination is a endhost
+                        if (rule.nextHop == rule.fieldValue[NW_DST]) {
                             link.isGateway = true;
                         }
-                        for (unsigned int i = 0; i < endhosts.size(); i++) {
-                            if (rule.nextHop.compare(endhosts[i]) == 0) {
+                        for (const auto & endhost : endhosts) {
+                            if (rule.nextHop == endhost) {
                                 link.isGateway = true;
                                 break;
                             }

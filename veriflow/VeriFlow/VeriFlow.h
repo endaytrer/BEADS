@@ -104,6 +104,7 @@ public:
 	bool addRule(const Rule& rule);
 	bool removeRule(const Rule& rule);
 
+    void traverseAllTries(const Rule &rule, const vector<Trie *> &prevTries, const vector<EquivalenceClass> &prevClasses, FieldIndex fi, uint64_t *lb, uint64_t *ub, vector<EquivalenceClass> &vFinalPacketClasses, vector<vector<Trie *> > &vFinalTries);
 	bool getAffectedEquivalenceClasses(const Rule& rule, int command, vector< EquivalenceClass >& vFinalPacketClasses, vector< vector< Trie* > >& vFinalTries);
 	void processCurrentHop(const EquivalenceClass& packetClass, ForwardingGraph* graph, const string& currentLocation, unordered_set< string >& visited, NextHopInfo& nextHopInfo, FILE* fp);
 

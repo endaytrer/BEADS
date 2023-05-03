@@ -52,9 +52,9 @@ int createThread(pthread_t *thread, void *(*threadFunction)(void *), void *arg, 
         minPriority = sched_get_priority_min(SCHED_OTHER);
 
         if (priority == MIN_PRIORITY) {
-            schedulingValue.__sched_priority = minPriority;
+            schedulingValue.sched_priority = minPriority;
         } else if (priority == MAX_PRIORITY) {
-            schedulingValue.__sched_priority = maxPriority;
+            schedulingValue.sched_priority = maxPriority;
         } else {
             perror("[createThread] Invalid priority value (can only be {MIN|NORMAL|MAX}_PRIORITY). Terminating process.\n");
             exit(2);

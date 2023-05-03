@@ -439,6 +439,8 @@ VeriFlow::~VeriFlow() {
 }
 
 bool VeriFlow::addRule(const Rule &rule) {
+    // add rule to every layers in the tree
+
     Trie *currentTrie = this->primaryTrie;
     vector<Trie *> vTries;
     for (int i = 0; i < ALL_FIELD_INDEX_END_MARKER; i++) {
@@ -464,7 +466,7 @@ bool VeriFlow::addRule(const Rule &rule) {
 
             leaf->ruleSet->insert(rule);
         } else {
-            // This was an intermediate trie.
+            // This was an intermediate trie. Only add rules to the last level trees.
             if (leaf->nextLevelTrie == nullptr) {
                 leaf->nextLevelTrie = new Trie((FieldIndex) (i + 1));
                 if (leaf->nextLevelTrie == nullptr) {
@@ -478,8 +480,8 @@ bool VeriFlow::addRule(const Rule &rule) {
         }
     }
 
-    for (unsigned int i = 0; i < vTries.size(); i++) {
-        (vTries[i]->totalRuleCount)++;
+    for (auto & vTrie : vTries) {
+        (vTrie->totalRuleCount)++;
     }
 
     return true;
@@ -541,6 +543,44 @@ bool VeriFlow::removeRule(const Rule &rule) {
     return false;
 }
 
+void
+VeriFlow::traverseAllTries(const Rule &rule, const vector<Trie *> &prevTries, const vector<EquivalenceClass> &prevClasses, FieldIndex fi, uint64_t *lb, uint64_t *ub, vector<EquivalenceClass> &vFinalPacketClasses, vector<vector<Trie *> > &vFinalTries) {
+    if (fi == ALL_FIELD_INDEX_END_MARKER - 1) {
+        for (auto &prevClass: prevClasses) {
+            lb[fi] = prevClass.lowerBound[fi];
+            ub[fi] = prevClass.upperBound[fi];
+            EquivalenceClass packetClass(
+                    lb,
+                    ub);
+
+            vFinalPacketClasses.push_back(
+                    packetClass);
+            vFinalTries.push_back(
+                    prevTries);
+        }
+        return;
+    }
+    for (auto &prevClass: prevClasses) {
+        if (rule.type != FORWARDING) {
+            continue;
+        }
+
+        lb[fi] = prevClass.lowerBound[fi];
+        ub[fi] = prevClass.upperBound[fi];
+        vector<EquivalenceClass> nextClasses;
+        vector<Trie *> nextTries;
+        Trie::getNextLevelEquivalenceClasses(fi, prevClass.lowerBound[fi], rule, prevTries, nextClasses, nextTries);
+        if (nextClasses.empty()) {
+            fprintf(stderr, "[VeriFlow::getAffectedEquivalenceClasses] Error in rule: %s\n",
+                    rule.toString().c_str());
+            fprintf(stderr,
+                    "[VeriFlow::getAffectedEquivalenceClasses] Error: ((FieldIndex #%d's equivalence class).size() == 0). Terminating process.\n", fi + 1);
+            exit(1);
+        }
+        VeriFlow::traverseAllTries(rule, nextTries, nextClasses, (FieldIndex)((int)fi + 1), lb, ub, vFinalPacketClasses, vFinalTries);
+    }
+}
+
 bool
 VeriFlow::getAffectedEquivalenceClasses(const Rule &rule, int command, vector<EquivalenceClass> &vFinalPacketClasses,
                                         vector<vector<Trie *> > &vFinalTries) {
@@ -564,7 +604,7 @@ VeriFlow::getAffectedEquivalenceClasses(const Rule &rule, int command, vector<Eq
     vector<EquivalenceClass> vInPortPacketClasses;
     this->primaryTrie->getEquivalenceClasses(rule, vInPortPacketClasses);
 
-    if (vInPortPacketClasses.size() == 0) {
+    if (vInPortPacketClasses.empty()) {
         fprintf(stderr, "[VeriFlow::getAffectedEquivalenceClasses] Error in rule: %s\n", rule.toString().c_str());
         fprintf(stderr,
                 "[VeriFlow::getAffectedEquivalenceClasses] Error: (vInPortPacketClasses.size() == 0). Terminating process.\n");
@@ -573,371 +613,8 @@ VeriFlow::getAffectedEquivalenceClasses(const Rule &rule, int command, vector<Eq
 
     vector<Trie *> vInPortTries;
     vInPortTries.push_back(this->primaryTrie);
-    for (auto &vInPortPacketClasse: vInPortPacketClasses) // Level 1
-    {
-        // fprintf(stdout, "rule.fieldValue[DL_SRC]: %s\n", rule.fieldValue[DL_SRC].c_str());
-        // fprintf(stdout, "rule.fieldMask[DL_SRC]: %s\n", rule.fieldMask[DL_SRC].c_str());
-        // fprintf(stdout, "vInPortPacketClasses[%u]: %s\n", i, vInPortPacketClasses[i].toString().c_str());
-
-        vector<EquivalenceClass> vDlSrcPacketClasses;
-        vector<Trie *> vDlSrcTries;
-        if (rule.type == FORWARDING) {
-            Trie::getNextLevelEquivalenceClasses(IN_PORT, vInPortPacketClasse.lowerBound[IN_PORT], rule, vInPortTries,
-                                                 vDlSrcPacketClasses, vDlSrcTries);
-
-            if (vDlSrcPacketClasses.empty()) {
-                fprintf(stderr, "[VeriFlow::getAffectedEquivalenceClasses] Error in rule: %s\n",
-                        rule.toString().c_str());
-                fprintf(stderr,
-                        "[VeriFlow::getAffectedEquivalenceClasses] Error: (vDlSrcPacketClasses.size() == 0). Terminating process.\n");
-                exit(1);
-            }
-
-            for (unsigned int j = 0; j < vDlSrcPacketClasses.size(); j++) // Level 2
-            {
-                vector<EquivalenceClass> vDlDstPacketClasses;
-                vector<Trie *> vDlDstTries;
-                if (rule.type == FORWARDING) {
-                    Trie::getNextLevelEquivalenceClasses(DL_SRC, vDlSrcPacketClasses[j].lowerBound[DL_SRC], rule,
-                                                         vDlSrcTries, vDlDstPacketClasses, vDlDstTries);
-
-                    if (vDlDstPacketClasses.empty()) {
-                        fprintf(stderr, "[VeriFlow::getAffectedEquivalenceClasses] Error in rule: %s\n",
-                                rule.toString().c_str());
-                        fprintf(stderr,
-                                "[VeriFlow::getAffectedEquivalenceClasses] Error: (vDlDstPacketClasses.size() == 0). Terminating process.\n");
-                        exit(1);
-                    }
-
-                    for (unsigned int k = 0; k < vDlDstPacketClasses.size(); k++) // Level 3
-                    {
-                        vector<EquivalenceClass> vDlTypePacketClasses;
-                        vector<Trie *> vDlTypeTries;
-                        if (rule.type == FORWARDING) {
-                            Trie::getNextLevelEquivalenceClasses(DL_DST, vDlDstPacketClasses[k].lowerBound[DL_DST],
-                                                                 rule, vDlDstTries, vDlTypePacketClasses, vDlTypeTries);
-
-                            if (vDlTypePacketClasses.empty()) {
-                                fprintf(stderr, "[VeriFlow::getAffectedEquivalenceClasses] Error in rule: %s\n",
-                                        rule.toString().c_str());
-                                fprintf(stderr,
-                                        "[VeriFlow::getAffectedEquivalenceClasses] Error: (vDlTypePacketClasses.size() == 0). Terminating process.\n");
-                                exit(1);
-                            }
-
-                            for (unsigned int l = 0; l < vDlTypePacketClasses.size(); l++) // Level 4
-                            {
-                                vector<EquivalenceClass> vDlVlanPacketClasses;
-                                vector<Trie *> vDlVlanTries;
-                                if (rule.type == FORWARDING) {
-                                    Trie::getNextLevelEquivalenceClasses(DL_TYPE,
-                                                                         vDlTypePacketClasses[l].lowerBound[DL_TYPE],
-                                                                         rule, vDlTypeTries, vDlVlanPacketClasses,
-                                                                         vDlVlanTries);
-
-                                    if (vDlVlanPacketClasses.size() == 0) {
-                                        fprintf(stderr, "[VeriFlow::getAffectedEquivalenceClasses] Error in rule: %s\n",
-                                                rule.toString().c_str());
-                                        fprintf(stderr,
-                                                "[VeriFlow::getAffectedEquivalenceClasses] Error: (vDlVlanPacketClasses.size() == 0). Terminating process.\n");
-                                        exit(1);
-                                    }
-
-                                    for (unsigned int m = 0; m < vDlVlanPacketClasses.size(); m++) // Level 5
-                                    {
-                                        vector<EquivalenceClass> vDlVlanPcpPacketClasses;
-                                        vector<Trie *> vDlVlanPcpTries;
-                                        if (rule.type == FORWARDING) {
-                                            Trie::getNextLevelEquivalenceClasses(DL_VLAN,
-                                                                                 vDlVlanPacketClasses[m].lowerBound[DL_VLAN],
-                                                                                 rule, vDlVlanTries,
-                                                                                 vDlVlanPcpPacketClasses,
-                                                                                 vDlVlanPcpTries);
-
-                                            if (vDlVlanPcpPacketClasses.empty()) {
-                                                fprintf(stderr,
-                                                        "[VeriFlow::getAffectedEquivalenceClasses] Error in rule: %s\n",
-                                                        rule.toString().c_str());
-                                                fprintf(stderr,
-                                                        "[VeriFlow::getAffectedEquivalenceClasses] Error: (vDlVlanPcpPacketClasses.size() == 0). Terminating process.\n");
-                                                exit(1);
-                                            }
-
-                                            for (unsigned int n = 0; n < vDlVlanPcpPacketClasses.size(); n++) // Level 6
-                                            {
-                                                vector<EquivalenceClass> vMplsLabelPacketClasses;
-                                                vector<Trie *> vMplsLabelTries;
-                                                if (rule.type == FORWARDING) {
-                                                    Trie::getNextLevelEquivalenceClasses(DL_VLAN_PCP,
-                                                                                         vDlVlanPcpPacketClasses[n].lowerBound[DL_VLAN_PCP],
-                                                                                         rule, vDlVlanPcpTries,
-                                                                                         vMplsLabelPacketClasses,
-                                                                                         vMplsLabelTries);
-
-                                                    if (vMplsLabelPacketClasses.size() == 0) {
-                                                        fprintf(stderr,
-                                                                "[VeriFlow::getAffectedEquivalenceClasses] Error in rule: %s\n",
-                                                                rule.toString().c_str());
-                                                        fprintf(stderr,
-                                                                "[VeriFlow::getAffectedEquivalenceClasses] Error: (vMplsLabelPacketClasses.size() == 0). Terminating process.\n");
-                                                        exit(1);
-                                                    }
-
-                                                    for (unsigned int o = 0;
-                                                         o < vMplsLabelPacketClasses.size(); o++) // Level 7
-                                                    {
-                                                        vector<EquivalenceClass> vMplsTcPacketClasses;
-                                                        vector<Trie *> vMplsTcTries;
-                                                        if (rule.type == FORWARDING) {
-                                                            Trie::getNextLevelEquivalenceClasses(MPLS_LABEL,
-                                                                                                 vMplsLabelPacketClasses[o].lowerBound[MPLS_LABEL],
-                                                                                                 rule, vMplsLabelTries,
-                                                                                                 vMplsTcPacketClasses,
-                                                                                                 vMplsTcTries);
-
-                                                            if (vMplsTcPacketClasses.size() == 0) {
-                                                                fprintf(stderr,
-                                                                        "[VeriFlow::getAffectedEquivalenceClasses] Error in rule: %s\n",
-                                                                        rule.toString().c_str());
-                                                                fprintf(stderr,
-                                                                        "[VeriFlow::getAffectedEquivalenceClasses] Error: (vMplsTcPacketClasses.size() == 0). Terminating process.\n");
-                                                                exit(1);
-                                                            }
-
-                                                            for (unsigned int p = 0;
-                                                                 p < vMplsTcPacketClasses.size(); p++) // Level 8
-                                                            {
-                                                                vector<EquivalenceClass> vNwSrcPacketClasses;
-                                                                vector<Trie *> vNwSrcTries;
-                                                                if (rule.type == FORWARDING) {
-                                                                    Trie::getNextLevelEquivalenceClasses(MPLS_TC,
-                                                                                                         vMplsTcPacketClasses[p].lowerBound[MPLS_TC],
-                                                                                                         rule,
-                                                                                                         vMplsTcTries,
-                                                                                                         vNwSrcPacketClasses,
-                                                                                                         vNwSrcTries);
-
-                                                                    if (vNwSrcPacketClasses.size() == 0) {
-                                                                        fprintf(stderr,
-                                                                                "[VeriFlow::getAffectedEquivalenceClasses] Error in rule: %s\n",
-                                                                                rule.toString().c_str());
-                                                                        fprintf(stderr,
-                                                                                "[VeriFlow::getAffectedEquivalenceClasses] Error: (vNwSrcPacketClasses.size() == 0). Terminating process.\n");
-                                                                        exit(1);
-                                                                    }
-
-                                                                    for (unsigned int q = 0;
-                                                                         q < vNwSrcPacketClasses.size(); q++) // Level 9
-                                                                    {
-                                                                        vector<EquivalenceClass> vNwDstPacketClasses;
-                                                                        vector<Trie *> vNwDstTries;
-                                                                        if (rule.type == FORWARDING) {
-                                                                            Trie::getNextLevelEquivalenceClasses(NW_SRC,
-                                                                                                                 vNwSrcPacketClasses[q].lowerBound[NW_SRC],
-                                                                                                                 rule,
-                                                                                                                 vNwSrcTries,
-                                                                                                                 vNwDstPacketClasses,
-                                                                                                                 vNwDstTries);
-
-                                                                            if (vNwDstPacketClasses.size() == 0) {
-                                                                                fprintf(stderr,
-                                                                                        "[VeriFlow::getAffectedEquivalenceClasses] Error in rule: %s\n",
-                                                                                        rule.toString().c_str());
-                                                                                fprintf(stderr,
-                                                                                        "[VeriFlow::getAffectedEquivalenceClasses] Error: (vNwDstPacketClasses.size() == 0). Terminating process.\n");
-                                                                                exit(1);
-                                                                            }
-
-                                                                            for (unsigned int r = 0; r <
-                                                                                                     vNwDstPacketClasses.size(); r++) // Level 10
-                                                                            {
-                                                                                vector<EquivalenceClass> vNwProtoPacketClasses;
-                                                                                vector<Trie *> vNwProtoTries;
-                                                                                if (rule.type == FORWARDING) {
-                                                                                    Trie::getNextLevelEquivalenceClasses(
-                                                                                            NW_DST,
-                                                                                            vNwDstPacketClasses[r].lowerBound[NW_DST],
-                                                                                            rule, vNwDstTries,
-                                                                                            vNwProtoPacketClasses,
-                                                                                            vNwProtoTries);
-
-                                                                                    if (vNwProtoPacketClasses.size() ==
-                                                                                        0) {
-                                                                                        fprintf(stderr,
-                                                                                                "[VeriFlow::getAffectedEquivalenceClasses] Error in rule: %s\n",
-                                                                                                rule.toString().c_str());
-                                                                                        fprintf(stderr,
-                                                                                                "[VeriFlow::getAffectedEquivalenceClasses] Error: (vNwProtoPacketClasses.size() == 0). Terminating process.\n");
-                                                                                        exit(1);
-                                                                                    }
-
-                                                                                    for (unsigned int s = 0; s <
-                                                                                                             vNwProtoPacketClasses.size(); s++) // Level 11
-                                                                                    {
-                                                                                        vector<EquivalenceClass> vNwTosPacketClasses;
-                                                                                        vector<Trie *> vNwTosTries;
-                                                                                        if (rule.type == FORWARDING) {
-                                                                                            Trie::getNextLevelEquivalenceClasses(
-                                                                                                    NW_PROTO,
-                                                                                                    vNwProtoPacketClasses[s].lowerBound[NW_PROTO],
-                                                                                                    rule, vNwProtoTries,
-                                                                                                    vNwTosPacketClasses,
-                                                                                                    vNwTosTries);
-
-                                                                                            if (vNwTosPacketClasses.size() ==
-                                                                                                0) {
-                                                                                                fprintf(stderr,
-                                                                                                        "[VeriFlow::getAffectedEquivalenceClasses] Error in rule: %s\n",
-                                                                                                        rule.toString().c_str());
-                                                                                                fprintf(stderr,
-                                                                                                        "[VeriFlow::getAffectedEquivalenceClasses] Error: (vNwTosPacketClasses.size() == 0). Terminating process.\n");
-                                                                                                exit(1);
-                                                                                            }
-
-                                                                                            for (unsigned int t = 0; t <
-                                                                                                                     vNwTosPacketClasses.size(); t++) // Level 12
-                                                                                            {
-                                                                                                vector<EquivalenceClass> vTpSrcPacketClasses;
-                                                                                                vector<Trie *> vTpSrcTries;
-                                                                                                if (rule.type ==
-                                                                                                    FORWARDING) {
-                                                                                                    Trie::getNextLevelEquivalenceClasses(
-                                                                                                            NW_TOS,
-                                                                                                            vNwTosPacketClasses[t].lowerBound[NW_TOS],
-                                                                                                            rule,
-                                                                                                            vNwTosTries,
-                                                                                                            vTpSrcPacketClasses,
-                                                                                                            vTpSrcTries);
-
-                                                                                                    if (vTpSrcPacketClasses.size() ==
-                                                                                                        0) {
-                                                                                                        fprintf(stderr,
-                                                                                                                "[VeriFlow::getAffectedEquivalenceClasses] Error in rule: %s\n",
-                                                                                                                rule.toString().c_str());
-                                                                                                        fprintf(stderr,
-                                                                                                                "[VeriFlow::getAffectedEquivalenceClasses] Error: (vTpSrcPacketClasses.size() == 0). Terminating process.\n");
-                                                                                                        exit(1);
-                                                                                                    }
-
-                                                                                                    for (unsigned int u = 0;
-                                                                                                         u <
-                                                                                                         vTpSrcPacketClasses.size(); u++) // Level 13
-                                                                                                    {
-                                                                                                        vector<EquivalenceClass> vTpDstPacketClasses;
-                                                                                                        vector<Trie *> vTpDstTries;
-                                                                                                        if (rule.type ==
-                                                                                                            FORWARDING) {
-                                                                                                            Trie::getNextLevelEquivalenceClasses(
-                                                                                                                    TP_SRC,
-                                                                                                                    vTpSrcPacketClasses[u].lowerBound[TP_SRC],
-                                                                                                                    rule,
-                                                                                                                    vTpSrcTries,
-                                                                                                                    vTpDstPacketClasses,
-                                                                                                                    vTpDstTries);
-
-                                                                                                            if (vTpDstPacketClasses.size() ==
-                                                                                                                0) {
-                                                                                                                fprintf(stderr,
-                                                                                                                        "[VeriFlow::getAffectedEquivalenceClasses] Error in rule: %s\n",
-                                                                                                                        rule.toString().c_str());
-                                                                                                                fprintf(stderr,
-                                                                                                                        "[VeriFlow::getAffectedEquivalenceClasses] Error: (vTpDstPacketClasses.size() == 0). Terminating process.\n");
-                                                                                                                exit(1);
-                                                                                                            }
-
-                                                                                                            // This is the last level. Now, prepare the final equivalence classes/packets.
-                                                                                                            for (unsigned int v = 0;
-                                                                                                                 v <
-                                                                                                                 vTpDstPacketClasses.size(); v++) // Level 14
-                                                                                                            {
-                                                                                                                uint64_t lb[ALL_FIELD_INDEX_END_MARKER], ub[ALL_FIELD_INDEX_END_MARKER];
-                                                                                                                memset(lb,
-                                                                                                                       0,
-                                                                                                                       sizeof(lb));
-                                                                                                                memset(ub,
-                                                                                                                       0,
-                                                                                                                       sizeof(ub));
-
-                                                                                                                lb[IN_PORT] = vInPortPacketClasse.lowerBound[IN_PORT];
-                                                                                                                ub[IN_PORT] = vInPortPacketClasse.upperBound[IN_PORT];
-
-                                                                                                                lb[DL_SRC] = vDlSrcPacketClasses[j].lowerBound[DL_SRC];
-                                                                                                                ub[DL_SRC] = vDlSrcPacketClasses[j].upperBound[DL_SRC];
-
-                                                                                                                lb[DL_DST] = vDlDstPacketClasses[k].lowerBound[DL_DST];
-                                                                                                                ub[DL_DST] = vDlDstPacketClasses[k].upperBound[DL_DST];
-
-                                                                                                                lb[DL_TYPE] = vDlTypePacketClasses[l].lowerBound[DL_TYPE];
-                                                                                                                ub[DL_TYPE] = vDlTypePacketClasses[l].upperBound[DL_TYPE];
-
-                                                                                                                lb[DL_VLAN] = vDlVlanPacketClasses[m].lowerBound[DL_VLAN];
-                                                                                                                ub[DL_VLAN] = vDlVlanPacketClasses[m].upperBound[DL_VLAN];
-
-                                                                                                                lb[DL_VLAN_PCP] = vDlVlanPcpPacketClasses[n].lowerBound[DL_VLAN_PCP];
-                                                                                                                ub[DL_VLAN_PCP] = vDlVlanPcpPacketClasses[n].upperBound[DL_VLAN_PCP];
-
-                                                                                                                lb[MPLS_LABEL] = vMplsLabelPacketClasses[o].lowerBound[MPLS_LABEL];
-                                                                                                                ub[MPLS_LABEL] = vMplsLabelPacketClasses[o].upperBound[MPLS_LABEL];
-
-                                                                                                                lb[MPLS_TC] = vMplsTcPacketClasses[p].lowerBound[MPLS_TC];
-                                                                                                                ub[MPLS_TC] = vMplsTcPacketClasses[p].upperBound[MPLS_TC];
-
-                                                                                                                lb[NW_SRC] = vNwSrcPacketClasses[q].lowerBound[NW_SRC];
-                                                                                                                ub[NW_SRC] = vNwSrcPacketClasses[q].upperBound[NW_SRC];
-
-                                                                                                                lb[NW_DST] = vNwDstPacketClasses[r].lowerBound[NW_DST];
-                                                                                                                ub[NW_DST] = vNwDstPacketClasses[r].upperBound[NW_DST];
-
-                                                                                                                lb[NW_PROTO] = vNwProtoPacketClasses[s].lowerBound[NW_PROTO];
-                                                                                                                ub[NW_PROTO] = vNwProtoPacketClasses[s].upperBound[NW_PROTO];
-
-                                                                                                                lb[NW_TOS] = vNwTosPacketClasses[t].lowerBound[NW_TOS];
-                                                                                                                ub[NW_TOS] = vNwTosPacketClasses[t].upperBound[NW_TOS];
-
-                                                                                                                lb[TP_SRC] = vTpSrcPacketClasses[u].lowerBound[TP_SRC];
-                                                                                                                ub[TP_SRC] = vTpSrcPacketClasses[u].upperBound[TP_SRC];
-
-                                                                                                                lb[TP_DST] = vTpDstPacketClasses[v].lowerBound[TP_DST];
-                                                                                                                ub[TP_DST] = vTpDstPacketClasses[v].upperBound[TP_DST];
-
-                                                                                                                EquivalenceClass packetClass(
-                                                                                                                        lb,
-                                                                                                                        ub);
-                                                                                                                // fprintf(stdout, "[VeriFlow::getAffectedEquivalenceClasses] Packet: %s\n", packet.toString().c_str());
-                                                                                                                // fflush(stdout);
-
-                                                                                                                vFinalPacketClasses.push_back(
-                                                                                                                        packetClass);
-                                                                                                                vFinalTries.push_back(
-                                                                                                                        vTpDstTries);
-                                                                                                            }
-                                                                                                        }
-                                                                                                    }
-                                                                                                }
-                                                                                            }
-                                                                                        }
-                                                                                    }
-                                                                                }
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
+    uint64_t lb[ALL_FIELD_INDEX_END_MARKER], ub[ALL_FIELD_INDEX_END_MARKER];
+    traverseAllTries(rule, vInPortTries, vInPortPacketClasses, IN_PORT, lb, ub, vFinalPacketClasses, vFinalTries);
     return true;
 }
 
@@ -966,7 +643,7 @@ VeriFlow::processCurrentHop(const EquivalenceClass &packetClass, ForwardingGraph
         return;
     }
 
-    if (graph->links[currentLocation].empty() == true) {
+    if (graph->links[currentLocation].empty()) {
         // Found a black hole.
         // fprintf(fp, "[VeriFlow::processCurrentHop] Found a black hole for the following packet class as there is no outgoing link at current location (%s).\n", currentLocation.c_str());
         // fprintf(fp, "[VeriFlow::processCurrentHop] PacketClass: %s\n", packetClass.toString().c_str());
@@ -1008,7 +685,7 @@ bool VeriFlow::verifyRule(const Rule &rule, int command, double &updateTime, dou
     vector<vector<Trie *> > vFinalTries;
 
     bool res = this->getAffectedEquivalenceClasses(rule, command, vFinalPacketClasses, vFinalTries);
-    if (res == false) {
+    if (!res) {
         return false;
     }
     gettimeofday(&end, nullptr);
@@ -1016,7 +693,7 @@ bool VeriFlow::verifyRule(const Rule &rule, int command, double &updateTime, dou
     seconds = end.tv_sec - start.tv_sec;
     useconds = end.tv_usec - start.tv_usec;
     usecTime = (seconds * 1000000) + useconds;
-    packetClassSearchTime = usecTime;
+    packetClassSearchTime = usecTime; // count time
 
     ecCount = vFinalPacketClasses.size();
     if (ecCount == 0) {
@@ -1053,6 +730,7 @@ bool VeriFlow::verifyRule(const Rule &rule, int command, double &updateTime, dou
     for (unsigned int i = 0; i < vGraph.size(); i++) {
         unordered_set<string> visited;
         string lastHop = network.getNextHopIpAddress(rule.location, rule.in_port);
+        // From one step before the designated string
         // fprintf(fp, "start traversing at: %s\n", rule.location.c_str());
         if (!this->traverseForwardingGraph(vFinalPacketClasses[i], vGraph[i], rule.location, lastHop, visited, fp)) {
             ++currentFailures;
@@ -1104,12 +782,12 @@ bool VeriFlow::traverseForwardingGraph(const EquivalenceClass &packetClass, Forw
         return true;
     }
 
-    if (currentLocation.compare("") == 0) {
+    if (currentLocation.empty()) {
         return true;
     }
 
     if (visited.find(currentLocation) != visited.end()) {
-        // Found a loop.
+        // Node is visited, Found a loop.
         fprintf(fp, "\n");
         fprintf(fp, "[VeriFlow::traverseForwardingGraph] Found a LOOP for the following packet class at node %s.\n",
                 currentLocation.c_str());
@@ -1145,7 +823,7 @@ bool VeriFlow::traverseForwardingGraph(const EquivalenceClass &packetClass, Forw
         return false;
     }
 
-    if (graph->links[currentLocation].empty() == true) {
+    if (graph->links[currentLocation].empty()) {
         // Found a black hole.
         fprintf(fp, "\n");
         fprintf(fp,
@@ -1163,23 +841,24 @@ bool VeriFlow::traverseForwardingGraph(const EquivalenceClass &packetClass, Forw
         return false;
     }
 
-    graph->links[currentLocation].sort(compareForwardingLink);
+    graph->links[currentLocation].sort(compareForwardingLink); // sort using priority, and forward
 
     const list<ForwardingLink> &linkList = graph->links[currentLocation];
     list<ForwardingLink>::const_iterator itr = linkList.begin();
     // input_port as a filter
-    if (lastHop.compare("nullptr") == 0 || itr->rule.in_port == 65536) {
+    if (lastHop == "nullptr" || itr->rule.in_port == 65536) {
         // do nothing
     } else {
         while (itr != linkList.end()) {
             string connected_hop = network.getNextHopIpAddress(currentLocation, itr->rule.in_port);
-            if (connected_hop.compare(lastHop) == 0) break;
+            if (connected_hop == lastHop) break;
             itr++;
         }
     }
 
     if (itr == linkList.end()) {
         // Found a black hole.
+        //QUESTION: Why this is a blackhole?
         fprintf(fp, "\n");
         fprintf(fp,
                 "[VeriFlow::traverseForwardingGraph] Found a BLACK HOLE for the following packet class as there is no outgoing link at current location (%s).\n",
@@ -1196,7 +875,7 @@ bool VeriFlow::traverseForwardingGraph(const EquivalenceClass &packetClass, Forw
         return false;
     }
 
-    if (itr->isGateway == true) {
+    if (itr->isGateway) {
         // Destination reachable.
         // fprintf(fp, "[VeriFlow::traverseForwardingGraph] Destination reachable.\n");
         fprintf(fp, "\n");
@@ -1204,6 +883,7 @@ bool VeriFlow::traverseForwardingGraph(const EquivalenceClass &packetClass, Forw
                 currentLocation.c_str());
         fprintf(fp, "[VeriFlow::traverseForwardingGraph] PacketClass: %s\n", packetClass.toString().c_str());
         for (unsigned int i = 0; i < faults.size(); i++) {
+            // If previous fault is subset of the rule, remove the rule
             if (packetClass.subsumes(faults[i])) {
                 fprintf(stderr, "Removing fault!\n");
                 faults.erase(faults.begin() + i);
@@ -1215,7 +895,7 @@ bool VeriFlow::traverseForwardingGraph(const EquivalenceClass &packetClass, Forw
         // Move to the next location.
         // fprintf(fp, "[VeriFlow::traverseForwardingGraph] Moving to node %s.\n", itr->rule.nextHop.c_str());
 
-        if (itr->rule.nextHop.compare("") == 0) {
+        if (itr->rule.nextHop == "") {
             // This rule is a packet filter. It drops packets.
             /* fprintf(fp, "\n");
             fprintf(fp, "[VeriFlow::traverseForwardingGraph] The following packet class is dropped by a packet filter at node %s.\n", currentLocation.c_str());
